@@ -5,8 +5,8 @@ import {
 	getFtpServerById,
 	updateFtpServer,
 	deleteFtpServer,
-} from "../controllers/ftpServerController";
-import { authenticate } from "../middlewares/authMiddleware";
+} from "../controllers/ftpServerController.js";
+import { authenticate } from "../middlewares/authMiddleware.js";
 
 const router: Router = express.Router();
 

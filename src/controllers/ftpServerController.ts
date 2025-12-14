@@ -1,5 +1,5 @@
 import { Request, Response } from "express";
-import FtpServer from "../models/FtpServer";
+import FtpServer from "../models/FtpServer.js";
 
 declare global {
 	namespace Express {
