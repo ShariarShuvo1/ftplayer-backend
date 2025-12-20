@@ -1,5 +1,10 @@
 import { Request, Response } from "express";
-import FtpServer from "../models/FtpServer.js";
+import FtpServer, { ServerType } from "../models/FtpServer.js";
+import {
+	getServerTypeConfig,
+	SERVER_TYPE_REGISTRY,
+	getServerCapabilities,
+} from "../services/serverTypeRegistry.js";
 
 declare global {
 	namespace Express {
@@ -9,30 +14,97 @@ declare global {
 	}
 }
 
+export const getServerTypes = async (
+	req: Request,
+	res: Response
+): Promise<void> => {
+	try {
+		const serverTypes = Object.entries(SERVER_TYPE_REGISTRY).map(
+			([type, config]) => ({
+				type,
+				name: type
+					.replace(/_/g, " ")
+					.split(" ")
+					.map((word) => word.charAt(0).toUpperCase() + word.slice(1))
+					.join(" "),
+				baseUrl: config.baseUrl,
+				imageBaseUrl: config.imageConfig.baseUrl,
+				capabilities: config.capabilities,
+				contentTypes: config.contentTypes,
+				endpoints: Object.keys(config.endpoints),
+			})
+		);
+
+		res.status(200).json({
+			message: "Server types retrieved successfully",
+			serverTypes,
+		});
+	} catch (error: any) {
+		res.status(500).json({
+			message: error.message || "Error fetching server types",
+		});
+	}
+};
+
 export const createFtpServer = async (
 	req: Request,
 	res: Response
 ): Promise<void> => {
 	try {
-		const { name, description, pingUrl, uiUrl, childServers, ispProvider } =
-			req.body;
+		const {
+			name,
+			description,
+			serverType,
+			ispProvider,
+			pingUrl,
+			uiUrl,
+			priority,
+		} = req.body;
 		const userId = req.userId;
 
-		if (!name || !pingUrl || !uiUrl || !ispProvider) {
+		if (!name || !serverType || !ispProvider) {
 			res.status(400).json({
-				message: "Please provide name, pingUrl, uiUrl, and ispProvider",
+				message: "Please provide name, serverType, and ispProvider",
 			});
 			return;
 		}
+
+		if (!Object.values(ServerType).includes(serverType as ServerType)) {
+			res.status(400).json({
+				message: `Invalid server type. Valid types: ${Object.values(
+					ServerType
+				).join(", ")}`,
+			});
+			return;
+		}
+
+		const existingServer = await FtpServer.findOne({
+			userId,
+			serverType: serverType as ServerType,
+			name,
+		});
+
+		if (existingServer) {
+			res.status(400).json({
+				message:
+					"A server with this name and type already exists for your account",
+			});
+			return;
+		}
+
+		const config = getServerTypeConfig(serverType as ServerType);
 
 		const newServer = new FtpServer({
 			userId,
 			name,
 			description,
+			serverType: serverType as ServerType,
+			config,
+			ispProvider,
 			pingUrl,
 			uiUrl,
-			childServers: childServers || [],
-			ispProvider,
+			priority: priority || 0,
+			isActive: true,
 		});
 
 		const savedServer = await newServer.save();
@@ -54,11 +126,73 @@ export const getAllFtpServers = async (
 ): Promise<void> => {
 	try {
 		const userId = req.userId;
+		const { isActive, serverType } = req.query;
 
-		const servers = await FtpServer.find({ userId });
+		const filter: any = { userId };
+
+		if (isActive !== undefined) {
+			filter.isActive = isActive === "true";
+		}
+
+		if (serverType) {
+			if (!Object.values(ServerType).includes(serverType as ServerType)) {
+				res.status(400).json({
+					message: "Invalid server type filter",
+				});
+				return;
+			}
+			filter.serverType = serverType;
+		}
+
+		const servers = await FtpServer.find(filter).sort({
+			priority: -1,
+			createdAt: -1,
+		});
 
 		res.status(200).json({
+			message: "Servers retrieved successfully",
+			count: servers.length,
 			servers,
+		});
+	} catch (error: any) {
+		res.status(500).json({
+			message: error.message || "Error fetching FTP servers",
+		});
+	}
+};
+
+export const getAllPublicFtpServers = async (
+	req: Request,
+	res: Response
+): Promise<void> => {
+	try {
+		const { isActive, serverType } = req.query;
+
+		const filter: any = {};
+
+		if (isActive !== undefined) {
+			filter.isActive = isActive === "true";
+		}
+
+		if (serverType) {
+			if (!Object.values(ServerType).includes(serverType as ServerType)) {
+				res.status(400).json({
+					message: "Invalid server type filter",
+				});
+				return;
+			}
+			filter.serverType = serverType;
+		}
+
+		const servers = await FtpServer.find(filter).sort({
+			priority: -1,
+			createdAt: -1,
+		});
+
+		res.status(200).json({
+			message: "All FTP servers retrieved successfully",
+			count: servers.length,
+			ftpServers: servers,
 		});
 	} catch (error: any) {
 		res.status(500).json({
@@ -84,8 +218,14 @@ export const getFtpServerById = async (
 			return;
 		}
 
+		const capabilities = getServerCapabilities(server.serverType);
+
 		res.status(200).json({
-			server,
+			message: "Server retrieved successfully",
+			server: {
+				...server.toObject(),
+				capabilities,
+			},
 		});
 	} catch (error: any) {
 		res.status(500).json({
@@ -101,8 +241,15 @@ export const updateFtpServer = async (
 	try {
 		const { id } = req.params;
 		const userId = req.userId;
-		const { name, description, pingUrl, uiUrl, childServers, ispProvider } =
-			req.body;
+		const {
+			name,
+			description,
+			ispProvider,
+			pingUrl,
+			uiUrl,
+			priority,
+			isActive,
+		} = req.body;
 
 		const server = await FtpServer.findOne({ _id: id, userId });
 
@@ -113,12 +260,29 @@ export const updateFtpServer = async (
 			return;
 		}
 
-		if (name !== undefined) server.name = name;
+		if (name !== undefined) {
+			const existingServer = await FtpServer.findOne({
+				userId,
+				serverType: server.serverType,
+				name,
+				_id: { $ne: id },
+			});
+
+			if (existingServer) {
+				res.status(400).json({
+					message: "A server with this name already exists",
+				});
+				return;
+			}
+			server.name = name;
+		}
+
 		if (description !== undefined) server.description = description;
+		if (ispProvider !== undefined) server.ispProvider = ispProvider;
 		if (pingUrl !== undefined) server.pingUrl = pingUrl;
 		if (uiUrl !== undefined) server.uiUrl = uiUrl;
-		if (childServers !== undefined) server.childServers = childServers;
-		if (ispProvider !== undefined) server.ispProvider = ispProvider;
+		if (priority !== undefined) server.priority = priority;
+		if (isActive !== undefined) server.isActive = isActive;
 
 		const updatedServer = await server.save();
 
@@ -152,6 +316,11 @@ export const deleteFtpServer = async (
 
 		res.status(200).json({
 			message: "FTP server deleted successfully",
+			server: {
+				id: server._id,
+				name: server.name,
+				serverType: server.serverType,
+			},
 		});
 	} catch (error: any) {
 		res.status(500).json({
