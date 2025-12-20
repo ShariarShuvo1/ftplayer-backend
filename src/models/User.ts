@@ -5,6 +5,7 @@ export interface IUser extends Document {
 	name: string;
 	email: string;
 	password: string;
+	workingFtpServers: mongoose.Types.ObjectId[];
 	createdAt: Date;
 	updatedAt: Date;
 	matchPassword(enteredPassword: string): Promise<boolean>;
@@ -33,6 +34,11 @@ const userSchema = new Schema<IUser>(
 			required: [true, "Please provide a password"],
 			minlength: [6, "Password must be at least 6 characters"],
 			select: false,
+		},
+		workingFtpServers: {
+			type: [Schema.Types.ObjectId],
+			ref: "FtpServer",
+			default: [],
 		},
 	},
 	{ timestamps: true }
