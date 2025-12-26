@@ -189,6 +189,120 @@ export const SERVER_TYPE_REGISTRY: Record<ServerType, ServerTypeConfig> = {
 			passFullObjectToDetails: true,
 		},
 	},
+
+	[ServerType.AMADER_FTP]: {
+		baseUrl: "http://amaderftp.net:8096",
+		imageConfig: {
+			baseUrl: "http://amaderftp.net:8096",
+			posterPath: "/Items/{itemId}/Images/Primary",
+			backdropPath: "/Items/{itemId}/Images/Backdrop",
+			dynamicPaths: true,
+		},
+		requiresAuth: true,
+		capabilities: [
+			ServerCapability.BROWSE_HOME,
+			ServerCapability.BROWSE_CATEGORIES,
+			ServerCapability.SEARCH,
+			ServerCapability.WATCH,
+			ServerCapability.DOWNLOAD,
+			ServerCapability.PAGINATION,
+			ServerCapability.TV_SERIES,
+			ServerCapability.SEASONED_EPISODES,
+			ServerCapability.FILTER_BY_CATEGORY,
+		],
+		contentTypes: [ContentType.MOVIE, ContentType.SERIES],
+		endpoints: {
+			authenticate: "/Users/authenticatebyname",
+			userItems: "/Users/{userId}/Items",
+			itemDetails: "/Users/{userId}/Items/{itemId}",
+			seriesEpisodes: "/Shows/{seriesId}/Episodes",
+			search: "/Users/{userId}/Items",
+			browse: "/Users/{userId}/Items",
+			images: "/Items/{itemId}/Images/{imageType}",
+		},
+		paginationStyle: "offset",
+		responseFormat: "json",
+		customFields: {
+			authCredentials: {
+				username: "user",
+				password: "1234",
+			},
+			authHeader: "X-Emby-Authorization",
+			authHeaderFormat:
+				'MediaBrowser Client="{client}", Device="{device}", DeviceId="{deviceId}", Version="{version}"',
+			authHeaderWithToken:
+				'MediaBrowser Client="{client}", Device="{device}", DeviceId="{deviceId}", Version="{version}", Token="{token}"',
+			defaultClient: "FTPlayer",
+			defaultDevice: "Mobile",
+			defaultVersion: "1.0.0",
+			libraryIds: {
+				movies: "4f9a1aee122b0b1d02c34ba39f31e331",
+				tvShows: "ea34d9f8d8b815c9ee04e1b30418f93d",
+			},
+			searchQueryParam: "searchTerm",
+			limitQueryParam: "Limit",
+			startIndexParam: "StartIndex",
+			sortByParam: "SortBy",
+			sortOrderParam: "SortOrder",
+			recursiveParam: "Recursive",
+			includeItemTypesParam: "IncludeItemTypes",
+			parentIdParam: "ParentId",
+			fieldsParam: "Fields",
+			defaultLimit: 20,
+			defaultFields:
+				"PrimaryImageAspectRatio,MediaSourceCount,BasicSyncInfo",
+			itemTypes: {
+				movie: "Movie",
+				series: "Series",
+				episode: "Episode",
+			},
+			sortOptions: {
+				dateCreated: "DateCreated",
+				premiereDate: "PremiereDate",
+				sortName: "SortName",
+				datePlayed: "DatePlayed",
+			},
+			ticksPerSecond: 10000000,
+			imageConstruction: {
+				poster: {
+					path: "/Items/{itemId}/Images/Primary",
+					queryParams: ["tag", "quality", "fillWidth", "fillHeight"],
+					defaultQuality: 96,
+					defaultWidth: 207,
+					defaultHeight: 310,
+				},
+				backdrop: {
+					path: "/Items/{itemId}/Images/Backdrop",
+					queryParams: ["tag", "quality", "fillWidth", "fillHeight"],
+					defaultQuality: 96,
+					defaultWidth: 360,
+					defaultHeight: 203,
+				},
+				logo: {
+					path: "/Items/{itemId}/Images/Logo",
+					queryParams: ["tag", "quality"],
+				},
+			},
+			metadataFields: [
+				"Id",
+				"Name",
+				"Type",
+				"RunTimeTicks",
+				"PremiereDate",
+				"OfficialRating",
+				"CommunityRating",
+				"Overview",
+				"Genres",
+				"ProductionYear",
+				"ImageTags",
+				"BackdropImageTags",
+				"UserData",
+				"MediaSources",
+				"Path",
+			],
+			streamUrlTemplate: "/Videos/{itemId}/stream",
+		},
+	},
 };
 
 export function getServerTypeConfig(serverType: ServerType): ServerTypeConfig {
@@ -240,6 +354,14 @@ export function buildImageUrl(
 			}
 			const posterPath = imageConfig.posterPath || "/poster/";
 			return `${imageConfig.baseUrl}${posterPath}${imagePath}`;
+
+		case ServerType.AMADER_FTP:
+			if (!contentId) return "";
+			const amaderPath =
+				imageType === "backdrop"
+					? imageConfig.backdropPath?.replace("{itemId}", contentId)
+					: imageConfig.posterPath?.replace("{itemId}", contentId);
+			return `${imageConfig.baseUrl}${amaderPath}?tag=${imagePath}&quality=96`;
 
 		default:
 			return `${imageConfig.baseUrl}${imagePath}`;

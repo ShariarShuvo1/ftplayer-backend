@@ -3,6 +3,7 @@ import mongoose, { Schema, Document } from "mongoose";
 export enum ServerType {
 	CIRCLE_FTP = "circleftp",
 	DFLIX = "dflix",
+	AMADER_FTP = "amaderftp",
 }
 
 export enum ServerCapability {
@@ -46,6 +47,11 @@ export interface EndpointConfig {
 	menu?: string;
 	genres?: string;
 	years?: string;
+	authenticate?: string;
+	userItems?: string;
+	itemDetails?: string;
+	seriesEpisodes?: string;
+	images?: string;
 }
 
 export interface ImageConfig {

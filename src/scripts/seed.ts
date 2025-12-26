@@ -65,12 +65,29 @@ const seedDatabase = async (): Promise<void> => {
 		});
 		console.log(`✓ Created Dflix server (ID: ${dflixServer._id})`);
 
+		const amaderFtpConfig = getServerTypeConfig(ServerType.AMADER_FTP);
+		const amaderFtpServer = await FtpServer.create({
+			userId: user._id,
+			name: "AmaderFTP Server",
+			description:
+				"AmaderFTP Jellyfin-based server with Movies and TV Series",
+			serverType: ServerType.AMADER_FTP,
+			config: amaderFtpConfig,
+			ispProvider: "Amader.Net",
+			pingUrl: "http://amaderftp.net:8096/",
+			uiUrl: "http://amaderftp.net/",
+			priority: 8,
+			isActive: true,
+		});
+		console.log(`✓ Created AmaderFTP server (ID: ${amaderFtpServer._id})`);
+
 		console.log("\n=== Seed Summary ===");
 		console.log(`User: ${user.name} (${user.email})`);
 		console.log(`Password: demo1234`);
-		console.log(`Servers created: 2`);
+		console.log(`Servers created: 3`);
 		console.log(`- CircleFTP (Priority: 10)`);
 		console.log(`- Dflix (Priority: 5)`);
+		console.log(`- AmaderFTP (Priority: 8)`);
 		console.log("\n✓ Database seeding completed successfully!");
 
 		await mongoose.disconnect();
