@@ -7,6 +7,7 @@ import {
 	getWatchHistoryById,
 	getContentWatchHistory,
 	deleteWatchHistory,
+	deleteEpisodeFromWatchHistory,
 	getWatchStats,
 } from "../controllers/watchHistoryController.js";
 import { authenticate } from "../middlewares/authMiddleware.js";
@@ -20,6 +21,7 @@ router.get("/", authenticate, getWatchHistory);
 router.get("/stats", authenticate, getWatchStats);
 router.get("/content", authenticate, getContentWatchHistory);
 router.get("/:id", authenticate, getWatchHistoryById);
+router.delete("/:id/episode", authenticate, deleteEpisodeFromWatchHistory);
 router.delete("/:id", authenticate, deleteWatchHistory);
 
 export default router;

@@ -454,6 +454,94 @@ export const deleteWatchHistory = async (
 	}
 };
 
+export const deleteEpisodeFromWatchHistory = async (
+	req: Request,
+	res: Response
+): Promise<void> => {
+	try {
+		const userId = req.userId;
+		const { id } = req.params;
+		const { seasonNumber, episodeNumber } = req.body;
+
+		if (seasonNumber == null || episodeNumber == null) {
+			res.status(400).json({
+				message: "Please provide seasonNumber and episodeNumber",
+			});
+			return;
+		}
+
+		const watchHistory = await WatchHistory.findOne({
+			_id: id,
+			userId,
+		});
+
+		if (!watchHistory) {
+			res.status(404).json({
+				message: "Watch history not found",
+			});
+			return;
+		}
+
+		if (!watchHistory.seriesProgress) {
+			res.status(404).json({
+				message: "No series progress found",
+			});
+			return;
+		}
+
+		const season = watchHistory.seriesProgress.find(
+			(s) => s.seasonNumber === seasonNumber
+		);
+
+		if (!season) {
+			res.status(404).json({
+				message: "Season not found",
+			});
+			return;
+		}
+
+		const episodeIndex = season.episodes.findIndex(
+			(e) => e.episodeNumber === episodeNumber
+		);
+
+		if (episodeIndex === -1) {
+			res.status(404).json({
+				message: "Episode not found",
+			});
+			return;
+		}
+
+		season.episodes.splice(episodeIndex, 1);
+
+		if (season.episodes.length === 0) {
+			const seasonIndex = watchHistory.seriesProgress.findIndex(
+				(s) => s.seasonNumber === seasonNumber
+			);
+			watchHistory.seriesProgress.splice(seasonIndex, 1);
+		}
+
+		if (watchHistory.seriesProgress.length === 0) {
+			await WatchHistory.findByIdAndDelete(id);
+			res.status(200).json({
+				message: "Series watch history deleted (no episodes remaining)",
+			});
+			return;
+		}
+
+		await watchHistory.save();
+
+		res.status(200).json({
+			message: "Episode deleted successfully",
+			watchHistory,
+		});
+	} catch (error: any) {
+		res.status(500).json({
+			message:
+				error.message || "Error deleting episode from watch history",
+		});
+	}
+};
+
 export const getWatchStats = async (
 	req: Request,
 	res: Response
